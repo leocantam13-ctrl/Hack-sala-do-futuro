@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="mobile-web-app-capable" content="yes">
+    <title>Sala do Futuro Auto</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🤖</text></svg>">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <h1>🤖 Sala do Futuro Auto</h1>
+            <button class="btn-icon" id="btnMenu" title="Menu">☰</button>
+        </header>
+
+        <!-- Menu Lateral -->
+        <nav class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <h3>Menu</h3>
+                <button class="btn-close" id="btnCloseMenu">✕</button>
+            </div>
+            <ul class="menu-list">
+                <li><button class="menu-item active" data-page="dashboard">📊 Dashboard</button></li>
+                <li><button class="menu-item" data-page="tasks">📚 Tarefas</button></li>
+                <li><button class="menu-item" data-page="api">🔑 API</button></li>
+                <li><button class="menu-item" data-page="config">⚙️ Configurações</button></li>
+                <li><button class="menu-item" data-page="logs">📝 Logs</button></li>
+                <li><button class="menu-item" data-page="about">ℹ️ Sobre</button></li>
+            </ul>
+        </nav>
+
+        <!-- Conteúdo Principal -->
+        <main class="main-content" id="mainContent">
+            <!-- Dashboard -->
+            <section class="page active" id="page-dashboard">
+                <h2>📊 Dashboard</h2>
+                
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <span class="stat-icon">📚</span>
+                        <span class="stat-value" id="statTotal">0</span>
+                        <span class="stat-label">Total de Tarefas</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-icon">✅</span>
+                        <span class="stat-value" id="statDone">0</span>
+                        <span class="stat-label">Concluídas</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-icon">⏳</span>
+                        <span class="stat-value" id="statPending">0</span>
+                        <span class="stat-label">Pendentes</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-icon">🎯</span>
+                        <span class="stat-value" id="statAccuracy">0%</span>
+                        <span class="stat-label">Precisão</span>
+                    </div>
+                </div>
+
+                <div class="quick-actions">
+                    <button class="btn btn-primary btn-lg" id="btnStartAll">
+                        ▶️ Executar Todas
+                    </button>
+                    <button class="btn btn-warning btn-lg" id="btnStopAll">
+                        ⏹️ Parar Tudo
+                    </button>
+                </div>
+
+                <div class="status-indicator" id="statusIndicator">
+                    <span class="dot"></span>
+                    <span id="statusText">Pronto</span>
+                </div>
+            </section>
+
+            <!-- Tarefas -->
+            <section class="page" id="page-tasks">
+                <h2>📚 Tarefas</h2>
+                
+                <div class="task-controls">
+                    <button class="btn btn-sm" id="btnRefresh">🔄 Atualizar</button>
+                    <button class="btn btn-sm" id="btnSelectAll">☑️ Todas</button>
+                    <input type="text" class="search-input" id="searchTasks" placeholder="🔍 Filtrar tarefas...">
+                </div>
+
+                <div class="task-list" id="taskList">
+                    <p class="empty-state">Nenhuma tarefa encontrada</p>
+                </div>
+            </section>
+
+            <!-- API -->
+            <section class="page" id="page-api">
+                <h2>🔑 Configuração da API</h2>
+                
+                <div class="api-config">
+                    <div class="form-group">
+                        <label for="apiUrl">URL da API:</label>
+                        <input type="url" id="apiUrl" placeholder="https://sua-api.com/responder" class="form-input">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="apiKey">Chave da API (Bearer Token):</label>
+                        <input type="password" id="apiKey" placeholder="sk-xxxxxxxxxxxx" class="form-input">
+                        <button class="btn btn-sm btn-show" id="btnShowKey">👁️</button>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="apiModel">Modelo (opcional):</label>
+                        <input type="text" id="apiModel" placeholder="gpt-3.5-turbo / gemini-pro" class="form-input">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Provedor:</label>
+                        <select id="apiProvider" class="form-input">
+                            <option value="openai">OpenAI (ChatGPT)</option>
+                            <option value="google">Google (Gemini)</option>
+                            <option value="anthropic">Anthropic (Claude)</option>
+                            <option value="deepseek">DeepSeek</option>
+                            <option value="custom">Personalizada</option>
+                        </select>
+                    </div>
+
+                    <div class="api-test">
+                        <button class="btn btn-primary" id="btnTestApi">🧪 Testar Conexão</button>
+                        <span class="test-result" id="testResult"></span>
+                    </div>
+
+                    <button class="btn btn-success btn-block" id="btnSaveApi">
+                        💾 Salvar API
+                    </button>
+                </div>
+
+                <div class="api-info">
+                    <h3>📖 Como funciona:</h3>
+                    <p>O app envia a pergunta para a API e ela retorna a resposta correta.</p>
+                    <p><strong>Formato esperado:</strong> {"pergunta": "...", "alternativas": ["..."]}</p>
+                    <p><strong>Resposta esperada:</strong> {"resposta": "A/B/C/D", "indice": 0}</p>
+                </div>
+            </section>
+
+            <!-- Configurações -->
+            <section class="page" id="page-config">
+                <h2>⚙️ Configurações</h2>
+                
+                <div class="config-group">
+                    <h3>⏱️ Tempo</h3>
+                    <div class="form-group">
+                        <label for="configDelay">Intervalo entre tarefas (segundos):</label>
+                        <input type="range" id="configDelay" min="1" max="30" value="5" class="range-input">
+                        <span class="range-value" id="delayValue">5s</span>
+                    </div>
+                </div>
+
+                <div class="config-group">
+                    <h3>🎯 Modo de Resposta</h3>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="configUseApi" checked>
+                            Usar API para responder
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="configFallback">
+                            Fallback automático (se API falhar)
+                        </label>
+                    </div>
+                </div>
+
+                <div class="config-group">
+                    <h3>🔔 Notificações</h3>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="configNotifications" checked>
+                            Mostrar notificações
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="configSound">
+                            Som ao concluir
+                        </label>
+                    </div>
+                </div>
+
+                <button class="btn btn-primary btn-block" id="btnSaveConfig">
+                    💾 Salvar Configurações
+                </button>
+            </section>
+
+            <!-- Logs -->
+            <section class="page" id="page-logs">
+                <h2>📝 Logs</h2>
+                
+                <div class="log-controls">
+                    <button class="btn btn-sm" id="btnClearLogs">🗑️ Limpar</button>
+                    <button class="btn btn-sm" id="btnExportLogs">📥 Exportar</button>
+                </div>
+
+                <div class="log-container" id="logContainer">
+                    <p class="empty-state">Nenhum log ainda</p>
+                </div>
+            </section>
+
+            <!-- Sobre -->
+            <section class="page" id="page-about">
+                <h2>ℹ️ Sobre</h2>
+                
+                <div class="about-content">
+                    <h3>🤖 Sala do Futuro Auto v3.0</h3>
+                    <p>App para automatizar tarefas da plataforma Sala do Futuro.</p>
+                    
+                    <h4>🔑 APIs Suportadas:</h4>
+                    <ul>
+                        <li>OpenAI (ChatGPT)</li>
+                        <li>Google Gemini</li>
+                        <li>Anthropic Claude</li>
+                        <li>DeepSeek</li>
+                        <li>API Personalizada</li>
+                    </ul>
+
+                    <h4>📝 Como usar:</h4>
+                    <ol>
+                        <li>Configure sua API em 🔑 API</li>
+                        <li>Acesse o site da Sala do Futuro</li>
+                        <li>As tarefas aparecerão automaticamente</li>
+                        <li>Execute e o app responderá via API</li>
+                    </ol>
+
+                    <button class="btn btn-primary" id="btnInstallApp">
+                        📲 Instalar App
+                    </button>
+                </div>
+            </section>
+        </main>
+
+        <!-- Overlay para menu mobile -->
+        <div class="overlay" id="overlay"></div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+              </html>
