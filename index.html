@@ -6,7 +6,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#0a0a0a">
-    <title>🦁 Lionel - Assistente Sala do Futuro</title>
+    <title>🦁 Lionel - Sala do Futuro</title>
     <link rel="stylesheet" href="style.css">
     <link rel="manifest" href="manifest.json">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🦁</text></svg>">
@@ -18,7 +18,7 @@
             <div class="login-header">
                 <span class="logo">🦁</span>
                 <h1>Lionel</h1>
-                <p>Seu assistente inteligente para o<br>Sala do Futuro</p>
+                <p>Assistente inteligente para Sala do Futuro</p>
             </div>
             
             <form class="login-form" id="loginForm">
@@ -38,26 +38,21 @@
                 </div>
                 
                 <button type="submit" class="btn-login">
-                    🚀 Entrar e Conectar
+                    🚀 Conectar na Plataforma
                 </button>
             </form>
-            
-            <div class="login-footer">
-                <p>Seus dados são salvos apenas no seu dispositivo</p>
-            </div>
         </div>
     </div>
 
     <!-- Tela Principal -->
     <div class="screen" id="mainScreen">
-        <!-- Header -->
         <header class="main-header">
             <button class="btn-icon" id="btnMenu">☰</button>
             <h2>🦁 Lionel</h2>
             <button class="btn-icon" id="btnLogout">🚪</button>
         </header>
 
-        <!-- Menu Lateral -->
+        <!-- Menu -->
         <nav class="sidebar" id="sidebar">
             <div class="sidebar-header">
                 <span>🦁</span>
@@ -65,58 +60,53 @@
                 <button class="btn-close" id="btnCloseMenu">✕</button>
             </div>
             <ul class="menu-list">
-                <li><button class="menu-item active" data-page="dashboard">📊 Dashboard</button></li>
+                <li><button class="menu-item active" data-page="platform">🏫 Plataforma</button></li>
+                <li><button class="menu-item" data-page="dashboard">📊 Dashboard</button></li>
                 <li><button class="menu-item" data-page="tasks">📚 Tarefas</button></li>
                 <li><button class="menu-item" data-page="api">🔑 API</button></li>
-                <li><button class="menu-item" data-page="chat">💬 Chat com Lionel</button></li>
-                <li><button class="menu-item" data-page="config">⚙️ Configurações</button></li>
+                <li><button class="menu-item" data-page="chat">💬 Chat c/ Lionel</button></li>
                 <li><button class="menu-item" data-page="logs">📝 Logs</button></li>
             </ul>
         </nav>
 
         <!-- Conteúdo -->
         <main class="main-content" id="mainContent">
+            <!-- Plataforma (IFRAME REAL) -->
+            <section class="page active" id="page-platform">
+                <div class="platform-container">
+                    <div class="platform-toolbar">
+                        <button class="btn btn-sm" id="btnScanNow">🔍 Escanear</button>
+                        <button class="btn btn-sm" id="btnAutoAnswer">🤖 Auto-Responder</button>
+                        <span class="platform-status" id="platformStatus">⏳ Carregando...</span>
+                    </div>
+                    <div class="iframe-wrapper" id="iframeWrapper">
+                        <div class="iframe-loading" id="iframeLoading">
+                            <span class="spinner">🦁</span>
+                            <p>Conectando na Sala do Futuro...</p>
+                        </div>
+                        <iframe id="platformFrame" sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-modals allow-downloads"></iframe>
+                    </div>
+                </div>
+            </section>
+
             <!-- Dashboard -->
-            <section class="page active" id="page-dashboard">
-                <h2>📊 Bem-vindo, <span id="userName">Aluno</span>!</h2>
-                
+            <section class="page" id="page-dashboard">
+                <h2>📊 Dashboard</h2>
                 <div class="stats-grid">
                     <div class="stat-card">
                         <span class="stat-icon">📚</span>
                         <span class="stat-value" id="statTotal">0</span>
-                        <span class="stat-label">Tarefas Totais</span>
+                        <span class="stat-label">Tarefas</span>
                     </div>
                     <div class="stat-card">
                         <span class="stat-icon">✅</span>
                         <span class="stat-value" id="statDone">0</span>
-                        <span class="stat-label">Concluídas</span>
+                        <span class="stat-label">Respondidas</span>
                     </div>
                     <div class="stat-card">
-                        <span class="stat-icon">⏳</span>
-                        <span class="stat-value" id="statPending">0</span>
-                        <span class="stat-label">Pendentes</span>
-                    </div>
-                    <div class="stat-card">
-                        <span class="stat-icon">🎯</span>
-                        <span class="stat-value" id="statAccuracy">0%</span>
-                        <span class="stat-label">Precisão</span>
-                    </div>
-                </div>
-
-                <div class="quick-actions">
-                    <button class="btn btn-primary btn-block" id="btnScanAll">
-                        🔍 Escanear Plataforma
-                    </button>
-                    <button class="btn btn-success btn-block" id="btnExecuteAll">
-                        ▶️ Executar Todas Tarefas
-                    </button>
-                </div>
-
-                <div class="status-card" id="statusCard">
-                    <div class="status-dot"></div>
-                    <div class="status-info">
-                        <strong id="statusTitle">Pronto</strong>
-                        <p id="statusMessage">Aguardando ação...</p>
+                        <span class="stat-icon">🤖</span>
+                        <span class="stat-value" id="statAI">0</span>
+                        <span class="stat-label">Via IA</span>
                     </div>
                 </div>
             </section>
@@ -124,17 +114,10 @@
             <!-- Tarefas -->
             <section class="page" id="page-tasks">
                 <h2>📚 Tarefas Encontradas</h2>
-                
-                <div class="task-controls">
-                    <button class="btn btn-sm" id="btnRefresh">🔄 Atualizar</button>
-                    <button class="btn btn-sm" id="btnSelectAll">☑️ Todas</button>
-                    <input type="text" class="search-input" id="searchTasks" placeholder="🔍 Filtrar...">
-                </div>
-
                 <div class="task-list" id="taskList">
                     <div class="empty-state">
-                        <span class="empty-icon">📋</span>
-                        <p>Clique em Escanear para encontrar tarefas</p>
+                        <span class="empty-icon">🔍</span>
+                        <p>Escaneie a plataforma para encontrar tarefas</p>
                     </div>
                 </div>
             </section>
@@ -142,166 +125,74 @@
             <!-- API -->
             <section class="page" id="page-api">
                 <h2>🔑 Configurar API</h2>
-                
                 <div class="api-config">
                     <div class="form-group">
                         <label>Provedor:</label>
                         <select id="apiProvider" class="form-input">
-                            <option value="gemini">Google Gemini (Recomendado)</option>
-                            <option value="openai">OpenAI (ChatGPT)</option>
+                            <option value="gemini">Google Gemini (GRÁTIS)</option>
+                            <option value="openai">OpenAI ChatGPT</option>
                             <option value="deepseek">DeepSeek</option>
-                            <option value="anthropic">Anthropic (Claude)</option>
-                            <option value="custom">API Personalizada</option>
+                            <option value="custom">Personalizada</option>
                         </select>
                     </div>
-
                     <div class="form-group">
                         <label>Chave da API:</label>
                         <div class="input-with-button">
-                            <input type="password" id="apiKey" placeholder="Cole sua chave aqui" class="form-input">
+                            <input type="password" id="apiKey" placeholder="Cole sua chave API" class="form-input">
                             <button class="btn btn-sm" id="btnShowKey">👁️</button>
                         </div>
                     </div>
-
                     <div class="form-group" id="customUrlGroup" style="display:none;">
                         <label>URL da API:</label>
-                        <input type="url" id="apiUrl" placeholder="https://sua-api.com/endpoint" class="form-input">
+                        <input type="url" id="apiUrl" placeholder="https://sua-api.com" class="form-input">
                     </div>
-
-                    <div class="form-group">
-                        <label>Modelo:</label>
-                        <input type="text" id="apiModel" placeholder="gemini-pro / gpt-3.5-turbo" class="form-input" value="gemini-pro">
-                    </div>
-
-                    <div class="form-group">
-                        <label>Temperatura (criatividade):</label>
-                        <input type="range" id="apiTemperature" min="0" max="2" step="0.1" value="0.7" class="range-input">
-                        <span class="range-value" id="tempValue">0.7</span>
-                    </div>
-
-                    <button class="btn btn-primary btn-block" id="btnTestApi">
-                        🧪 Testar Conexão
-                    </button>
-                    
+                    <button class="btn btn-primary btn-block" id="btnTestApi">🧪 Testar API</button>
                     <div class="test-result" id="testResult"></div>
-
-                    <button class="btn btn-success btn-block" id="btnSaveApi">
-                        💾 Salvar Configuração
-                    </button>
-                </div>
-
-                <div class="api-help">
-                    <h3>📖 Como obter a chave:</h3>
-                    <div class="help-item">
-                        <strong>Google Gemini (GRÁTIS):</strong>
-                        <p>1. Acesse: <a href="https://makersuite.google.com/app/apikey" target="_blank">makersuite.google.com</a></p>
-                        <p>2. Clique em "Create API Key"</p>
-                        <p>3. Copie a chave gerada</p>
-                    </div>
+                    <button class="btn btn-success btn-block" id="btnSaveApi">💾 Salvar</button>
                 </div>
             </section>
 
             <!-- Chat -->
             <section class="page" id="page-chat">
                 <h2>💬 Chat com Lionel</h2>
-                
                 <div class="chat-container">
                     <div class="chat-messages" id="chatMessages">
                         <div class="chat-message bot">
                             <div class="message-avatar">🦁</div>
                             <div class="message-content">
                                 <strong>Lionel</strong>
-                                <p>Olá! Eu sou o Lionel, seu assistente de estudos. Posso te ajudar com as tarefas, explicar conceitos e responder dúvidas. Como posso ajudar?</p>
+                                <p>Olá! Sou o Lionel, seu leão assistente! 🦁 Estou aqui para te ajudar com a Sala do Futuro. Você pode me perguntar sobre as tarefas, pedir explicações ou simplesmente conversar!</p>
                             </div>
                         </div>
                     </div>
-                    
                     <div class="chat-input-area">
-                        <textarea id="chatInput" placeholder="Pergunte algo para o Lionel..." rows="2"></textarea>
+                        <textarea id="chatInput" placeholder="Pergunte algo..." rows="2"></textarea>
                         <button class="btn btn-primary" id="btnSendChat">📤</button>
                     </div>
                 </div>
             </section>
 
-            <!-- Configurações -->
-            <section class="page" id="page-config">
-                <h2>⚙️ Configurações</h2>
-                
-                <div class="config-group">
-                    <h3>⏱️ Tempo</h3>
-                    <div class="form-group">
-                        <label>Intervalo entre tarefas (segundos):</label>
-                        <input type="range" id="configDelay" min="1" max="30" value="5" class="range-input">
-                        <span class="range-value" id="delayValue">5s</span>
-                    </div>
-                </div>
-
-                <div class="config-group">
-                    <h3>🤖 Modo de Resposta</h3>
-                    <div class="toggle-group">
-                        <label class="toggle">
-                            <input type="checkbox" id="configUseApi" checked>
-                            <span class="toggle-slider"></span>
-                            <span>Usar IA para responder</span>
-                        </label>
-                    </div>
-                    <div class="toggle-group">
-                        <label class="toggle">
-                            <input type="checkbox" id="configFallback">
-                            <span class="toggle-slider"></span>
-                            <span>Responder mesmo se API falhar</span>
-                        </label>
-                    </div>
-                </div>
-
-                <div class="config-group">
-                    <h3>🔔 Notificações</h3>
-                    <div class="toggle-group">
-                        <label class="toggle">
-                            <input type="checkbox" id="configNotifications" checked>
-                            <span class="toggle-slider"></span>
-                            <span>Notificações</span>
-                        </label>
-                    </div>
-                    <div class="toggle-group">
-                        <label class="toggle">
-                            <input type="checkbox" id="configSound">
-                            <span class="toggle-slider"></span>
-                            <span>Som ao concluir</span>
-                        </label>
-                    </div>
-                </div>
-
-                <button class="btn btn-primary btn-block" id="btnSaveConfig">
-                    💾 Salvar Configurações
-                </button>
-            </section>
-
             <!-- Logs -->
             <section class="page" id="page-logs">
-                <h2>📝 Logs de Atividades</h2>
-                
-                <div class="log-controls">
-                    <button class="btn btn-sm" id="btnClearLogs">🗑️ Limpar</button>
-                    <button class="btn btn-sm" id="btnExportLogs">📥 Exportar</button>
-                </div>
-
+                <h2>📝 Logs</h2>
                 <div class="log-container" id="logContainer">
                     <div class="empty-state">
                         <span class="empty-icon">📝</span>
-                        <p>Nenhum log ainda</p>
+                        <p>Logs aparecerão aqui</p>
                     </div>
                 </div>
             </section>
         </main>
     </div>
 
-    <!-- Iframe oculto para a plataforma -->
-    <iframe id="platformFrame" style="display:none;" sandbox="allow-same-origin allow-scripts allow-forms allow-popups"></iframe>
-
-    <!-- Overlay -->
     <div class="overlay" id="overlay"></div>
-
     <script src="app.js"></script>
+    
+    <!-- Registra Service Worker -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/sw.js');
+        }
+    </script>
 </body>
-                            </html>
+                        </html>
