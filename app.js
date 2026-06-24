@@ -1,14 +1,13 @@
-// ========== 🦁 LIONEL - ASSISTENTE SALA DO FUTURO ==========
+// ========== 🦁 LIONEL - APP PRINCIPAL ==========
 
 class LionelApp {
     constructor() {
-        this.user = this.loadUser();
         this.config = this.loadConfig();
+        this.user = this.loadUser();
         this.tasks = [];
         this.logs = [];
-        this.isRunning = false;
-        this.stats = { total: 0, done: 0, pending: 0, correct: 0, answered: 0 };
-        this.chatHistory = [];
+        this.stats = { total: 0, done: 0, ai: 0 };
+        this.proxyWorker = null; // URL do Cloudflare Worker
         
         this.init();
     }
@@ -16,7 +15,7 @@ class LionelApp {
     init() {
         if (this.user.loggedIn) {
             this.showScreen('mainScreen');
-            this.updateDashboard();
+            this.loadPlatform();
         } else {
             this.showScreen('loginScreen');
         }
@@ -28,7 +27,8 @@ class LionelApp {
     // ========== DADOS ==========
     loadUser() {
         try {
-            return JSON.parse(localStorage.getItem('lionel_user')) || { loggedIn: false };
+            const saved = localStorage.getItem('lionel_user');
+            return saved ? JSON.parse(saved) : { loggedIn: false };
         } catch { return { loggedIn: false }; }
     }
 
@@ -42,15 +42,14 @@ class LionelApp {
             apiKey: '',
             apiUrl: '',
             apiModel: 'gemini-pro',
-            apiTemperature: 0.7,
-            delay: 5,
+            delay: 3,
             useApi: true,
-            fallback: false,
             notifications: true,
-            sound: false
+            proxyUrl: '' // URL do seu Cloudflare Worker
         };
         try {
-            return { ...defaults, ...JSON.parse(localStorage.getItem('lionel_config')) };
+            const saved = localStorage.getItem('lionel_config');
+            return saved ? { ...defaults, ...JSON.parse(saved) } : defaults;
         } catch { return defaults; }
     }
 
@@ -60,18 +59,9 @@ class LionelApp {
     }
 
     loadSavedConfig() {
-        document.getElementById('apiProvider').value = this.config.apiProvider;
-        document.getElementById('apiKey').value = this.config.apiKey;
-        document.getElementById('apiUrl').value = this.config.apiUrl;
-        document.getElementById('apiModel').value = this.config.apiModel;
-        document.getElementById('apiTemperature').value = this.config.apiTemperature;
-        document.getElementById('tempValue').textContent = this.config.apiTemperature;
-        document.getElementById('configDelay').value = this.config.delay;
-        document.getElementById('delayValue').textContent = this.config.delay + 's';
-        document.getElementById('configUseApi').checked = this.config.useApi;
-        document.getElementById('configFallback').checked = this.config.fallback;
-        document.getElementById('configNotifications').checked = this.config.notifications;
-        document.getElementById('configSound').checked = this.config.sound;
+        document.getElementById('apiProvider').value = this.config.apiProvider || 'gemini';
+        document.getElementById('apiKey').value = this.config.apiKey || '';
+        document.getElementById('apiUrl').value = this.config.apiUrl || '';
     }
 
     // ========== TELAS ==========
@@ -101,45 +91,39 @@ class LionelApp {
             item.addEventListener('click', (e) => this.navigateTo(e.target.dataset.page));
         });
 
-        // Dashboard
-        document.getElementById('btnScanAll').addEventListener('click', () => this.scanPlatform());
-        document.getElementById('btnExecuteAll').addEventListener('click', () => this.executeAllTasks());
-
-        // Tasks
-        document.getElementById('btnRefresh').addEventListener('click', () => this.scanPlatform());
-        document.getElementById('btnSelectAll').addEventListener('click', () => this.selectAllTasks());
-        document.getElementById('searchTasks').addEventListener('input', (e) => this.renderTasks(e.target.value));
+        // Plataforma
+        document.getElementById('btnScanNow').addEventListener('click', () => this.scanPlatform());
+        document.getElementById('btnAutoAnswer').addEventListener('click', () => this.autoAnswer());
 
         // API
         document.getElementById('apiProvider').addEventListener('change', (e) => {
             document.getElementById('customUrlGroup').style.display = 
                 e.target.value === 'custom' ? 'block' : 'none';
         });
-        document.getElementById('apiTemperature').addEventListener('input', (e) => {
-            document.getElementById('tempValue').textContent = e.target.value;
+        document.getElementById('btnShowKey').addEventListener('click', () => {
+            const input = document.getElementById('apiKey');
+            input.type = input.type === 'password' ? 'text' : 'password';
         });
-        document.getElementById('btnShowKey').addEventListener('click', () => this.toggleApiKey());
-        document.getElementById('btnTestApi').addEventListener('click', () => this.testApiConnection());
+        document.getElementById('btnTestApi').addEventListener('click', () => this.testApi());
         document.getElementById('btnSaveApi').addEventListener('click', () => this.saveApiConfig());
 
         // Chat
-        document.getElementById('btnSendChat').addEventListener('click', () => this.sendChatMessage());
+        document.getElementById('btnSendChat').addEventListener('click', () => this.sendChat());
         document.getElementById('chatInput').addEventListener('keydown', (e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
-                this.sendChatMessage();
+                this.sendChat();
             }
         });
 
-        // Config
-        document.getElementById('configDelay').addEventListener('input', (e) => {
-            document.getElementById('delayValue').textContent = e.target.value + 's';
+        // Iframe carregou
+        const iframe = document.getElementById('platformFrame');
+        iframe.addEventListener('load', () => {
+            document.getElementById('iframeLoading').classList.add('hidden');
+            document.getElementById('platformStatus').textContent = '✅ Conectado';
+            this.addLog('✅ Plataforma carregada!', 'success');
+            this.injectScript();
         });
-        document.getElementById('btnSaveConfig').addEventListener('click', () => this.saveAllConfig());
-
-        // Logs
-        document.getElementById('btnClearLogs').addEventListener('click', () => this.clearLogs());
-        document.getElementById('btnExportLogs').addEventListener('click', () => this.exportLogs());
     }
 
     // ========== LOGIN ==========
@@ -156,10 +140,9 @@ class LionelApp {
         this.user = { ra, senha, url, loggedIn: true };
         this.saveUser();
         
-        document.getElementById('userName').textContent = ra;
         this.showScreen('mainScreen');
-        this.addLog('🔐 Login realizado com sucesso!', 'success');
-        this.updateStatus('🟢 Conectado', 'Pronto para usar!');
+        this.addLog('🔐 Login realizado!', 'success');
+        this.loadPlatform();
     }
 
     logout() {
@@ -168,206 +151,235 @@ class LionelApp {
         this.showScreen('loginScreen');
     }
 
-    // ========== NAVEGAÇÃO ==========
-    navigateTo(page) {
-        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-        document.querySelectorAll('.menu-item').forEach(m => m.classList.remove('active'));
-        
-        const pageEl = document.getElementById(`page-${page}`);
-        const menuItem = document.querySelector(`[data-page="${page}"]`);
-        
-        if (pageEl) pageEl.classList.add('active');
-        if (menuItem) menuItem.classList.add('active');
-        
-        this.toggleMenu(false);
-    }
-
-    toggleMenu(open) {
-        const sidebar = document.getElementById('sidebar');
-        const overlay = document.getElementById('overlay');
-        
-        if (open) {
-            sidebar.classList.add('open');
-            overlay.classList.add('open');
-        } else {
-            sidebar.classList.remove('open');
-            overlay.classList.remove('open');
-        }
-    }
-
     // ========== PLATAFORMA ==========
-    async scanPlatform() {
-        this.addLog('🔍 Escaneando plataforma...', 'info');
-        this.updateStatus('🔍 Escaneando', 'Procurando tarefas...');
+    loadPlatform() {
+        const iframe = document.getElementById('platformFrame');
+        const loading = document.getElementById('iframeLoading');
+        
+        loading.classList.remove('hidden');
+        document.getElementById('platformStatus').textContent = '⏳ Carregando...';
+        
+        // Se tiver Cloudflare Worker configurado, usa ele como proxy
+        if (this.config.proxyUrl) {
+            iframe.src = `${this.config.proxyUrl}?url=${encodeURIComponent(this.user.url)}`;
+        } else {
+            // Tenta carregar direto (provavelmente será bloqueado)
+            iframe.src = this.user.url;
+            this.addLog('⚠️ Sem proxy configurado. O site pode não carregar no iframe.', 'warning');
+            this.addLog('💡 Configure um Cloudflare Worker em 🔑 API', 'info');
+        }
+    }
 
+    injectScript() {
+        const iframe = document.getElementById('platformFrame');
+        
         try {
-            // Simula busca na plataforma
-            // Em produção, isso acessaria o iframe ou faria fetch
-            const mockTasks = [
-                { id: 1, title: 'Matemática - Equações do 2º grau', type: 'multipla_escolha', status: 'pending' },
-                { id: 2, title: 'Português - Interpretação de texto', type: 'multipla_escolha', status: 'pending' },
-                { id: 3, title: 'Ciências - Ecossistema brasileiro', type: 'multipla_escolha', status: 'pending' },
-                { id: 4, title: 'História - Brasil Colônia', type: 'multipla_escolha', status: 'pending' },
-                { id: 5, title: 'Geografia - Climas do Brasil', type: 'multipla_escolha', status: 'pending' },
-            ];
-
-            this.tasks = mockTasks;
-            this.stats.total = this.tasks.length;
-            this.stats.pending = this.tasks.filter(t => t.status === 'pending').length;
+            const script = `
+                // Script injetado na Sala do Futuro
+                window.lionelInjected = true;
+                
+                // Comunica com o app principal
+                window.addEventListener('message', function(event) {
+                    if (event.data.action === 'scan') {
+                        scanTasks();
+                    } else if (event.data.action === 'answer') {
+                        answerTask(event.data.taskIndex, event.data.answer);
+                    }
+                });
+                
+                function scanTasks() {
+                    const tasks = [];
+                    
+                    // Procura inputs de rádio (múltipla escolha)
+                    const radioGroups = {};
+                    document.querySelectorAll('input[type="radio"]').forEach(r => {
+                        if (!radioGroups[r.name]) radioGroups[r.name] = [];
+                        radioGroups[r.name].push(r);
+                    });
+                    
+                    // Procura checkboxes
+                    document.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+                        tasks.push({
+                            type: 'checkbox',
+                            text: cb.closest('label')?.textContent || 'Checkbox',
+                            element: cb
+                        });
+                    });
+                    
+                    // Procura campos de texto
+                    document.querySelectorAll('textarea, input[type="text"]').forEach(input => {
+                        tasks.push({
+                            type: 'text',
+                            text: input.placeholder || 'Campo de texto',
+                            element: input
+                        });
+                    });
+                    
+                    // Adiciona grupos de rádio
+                    Object.entries(radioGroups).forEach(([name, radios]) => {
+                        const parent = radios[0].closest('form, div, fieldset');
+                        const question = parent?.querySelector('h1,h2,h3,h4,p,label,legend')?.textContent?.trim() || 'Pergunta';
+                        
+                        tasks.push({
+                            type: 'radio',
+                            text: question.substring(0, 100),
+                            radios: radios,
+                            name: name
+                        });
+                    });
+                    
+                    // Envia pro app principal
+                    window.parent.postMessage({
+                        action: 'tasksFound',
+                        tasks: tasks.map(t => ({
+                            type: t.type,
+                            text: t.text,
+                            name: t.name,
+                            optionsCount: t.radios?.length || 0
+                        }))
+                    }, '*');
+                }
+                
+                function answerTask(index, answer) {
+                    const radioGroups = {};
+                    document.querySelectorAll('input[type="radio"]').forEach(r => {
+                        if (!radioGroups[r.name]) radioGroups[r.name] = [];
+                        radioGroups[r.name].push(r);
+                    });
+                    
+                    const groups = Object.values(radioGroups);
+                    if (groups[index] && groups[index][answer]) {
+                        groups[index][answer].click();
+                        groups[index][answer].dispatchEvent(new Event('change', { bubbles: true }));
+                    }
+                }
+                
+                // Notifica que está pronto
+                window.parent.postMessage({ action: 'scriptReady' }, '*');
+            `;
             
-            this.renderTasks();
-            this.updateDashboard();
-            this.addLog(`📚 ${this.tasks.length} tarefas encontradas!`, 'success');
-            this.updateStatus('✅ Pronto', `${this.tasks.length} tarefas disponíveis`);
-        } catch (error) {
-            this.addLog(`❌ Erro ao escanear: ${error.message}`, 'error');
+            iframe.contentWindow.eval(script);
+            this.addLog('✅ Script injetado na plataforma!', 'success');
+        } catch (e) {
+            this.addLog(`⚠️ Não foi possível injetar script: ${e.message}`, 'error');
+            this.addLog('💡 Isso acontece porque o site bloqueia iframes. Use o Cloudflare Worker!', 'info');
         }
     }
 
-    renderTasks(filter = '') {
-        const container = document.getElementById('taskList');
-        const filtered = this.tasks.filter(t => 
-            t.title.toLowerCase().includes(filter.toLowerCase())
-        );
-
-        if (filtered.length === 0) {
-            container.innerHTML = `<div class="empty-state"><span class="empty-icon">📋</span><p>Nenhuma tarefa encontrada</p></div>`;
-            return;
-        }
-
-        container.innerHTML = filtered.map(task => `
-            <div class="task-item">
-                <input type="checkbox" data-id="${task.id}" ${task.status === 'done' ? 'disabled checked' : ''}>
-                <div class="task-info">
-                    <div class="task-title">${task.title}</div>
-                    <span class="task-type">${task.type.replace('_', ' ')}</span>
-                </div>
-                <span class="task-status ${task.status === 'done' ? 'done' : 'pending'}">
-                    ${task.status === 'done' ? '✅' : '⏳'}
-                </span>
-            </div>
-        `).join('');
+    scanPlatform() {
+        this.addLog('🔍 Escaneando plataforma...', 'info');
+        
+        const iframe = document.getElementById('platformFrame');
+        
+        // Envia comando para o iframe
+        iframe.contentWindow.postMessage({ action: 'scan' }, '*');
+        
+        // Escuta a resposta
+        window.addEventListener('message', (event) => {
+            if (event.data.action === 'tasksFound') {
+                this.tasks = event.data.tasks.map((t, i) => ({
+                    ...t,
+                    id: i,
+                    status: 'pending'
+                }));
+                
+                this.stats.total = this.tasks.length;
+                this.renderTasks();
+                this.updateDashboard();
+                this.addLog(`📚 ${this.tasks.length} tarefas encontradas!`, 'success');
+            }
+        });
     }
 
-    selectAllTasks() {
-        const checkboxes = document.querySelectorAll('#taskList input[type="checkbox"]:not([disabled])');
-        const allChecked = Array.from(checkboxes).every(cb => cb.checked);
-        checkboxes.forEach(cb => { cb.checked = !allChecked; });
-    }
-
-    // ========== EXECUÇÃO ==========
-    async executeAllTasks() {
-        if (this.isRunning) {
-            this.addLog('⚠️ Já está executando!', 'warning');
+    async autoAnswer() {
+        if (!this.config.apiKey) {
+            this.addLog('⚠️ Configure sua API primeiro em 🔑 API', 'warning');
             return;
         }
 
         const pendingTasks = this.tasks.filter(t => t.status === 'pending');
+        
         if (pendingTasks.length === 0) {
-            this.addLog('⚠️ Nenhuma tarefa pendente!', 'warning');
+            this.addLog('⚠️ Nenhuma tarefa pendente. Escaneie primeiro!', 'warning');
             return;
         }
 
-        this.isRunning = true;
-        this.updateStatus('⚡ Executando', `Processando ${pendingTasks.length} tarefas...`);
-        this.addLog(`🚀 Iniciando ${pendingTasks.length} tarefas`, 'info');
+        this.addLog(`🤖 Iniciando auto-resposta para ${pendingTasks.length} tarefas...`, 'info');
 
-        for (const task of pendingTasks) {
-            if (!this.isRunning) break;
-            await this.processTask(task);
-            await this.delay(this.config.delay * 1000);
-        }
-
-        this.isRunning = false;
-        this.updateStatus('✅ Concluído', 'Todas as tarefas processadas!');
-        this.addLog('🎉 Todas as tarefas concluídas!', 'success');
-        
-        if (this.config.notifications) {
-            this.showNotification('Tarefas Concluídas', `${pendingTasks.length} tarefas processadas!`);
-        }
-    }
-
-    async processTask(task) {
-        this.addLog(`⏳ Processando: ${task.title}`, 'info');
-
-        try {
-            let answer;
+        for (let i = 0; i < pendingTasks.length; i++) {
+            const task = pendingTasks[i];
             
-            if (this.config.useApi && this.config.apiKey) {
-                answer = await this.getAIAnswer(task);
-                this.addLog(`🤖 Resposta IA: ${answer}`, 'api');
-            } else {
-                answer = 'A'; // Resposta padrão
-                this.addLog('⚠️ API não configurada - usando resposta padrão', 'warning');
-            }
-
-            task.status = 'done';
-            this.stats.done++;
-            this.stats.pending--;
-            this.stats.answered++;
-            this.stats.correct++; // Assumindo que a IA acertou
-            
-            this.renderTasks();
-            this.updateDashboard();
-            this.addLog(`✅ Concluída: ${task.title}`, 'success');
-        } catch (error) {
-            this.addLog(`❌ Erro: ${error.message}`, 'error');
-            
-            if (this.config.fallback) {
+            try {
+                // Pergunta pra API
+                const answer = await this.askAI(task.text, task.type);
+                this.addLog(`🤖 Tarefa ${i+1}: ${answer}`, 'api');
+                
+                // Envia resposta pro iframe
+                const iframe = document.getElementById('platformFrame');
+                iframe.contentWindow.postMessage({
+                    action: 'answer',
+                    taskIndex: i,
+                    answer: answer
+                }, '*');
+                
                 task.status = 'done';
-                this.addLog('⚠️ Usando fallback...', 'warning');
+                this.stats.done++;
+                this.stats.ai++;
+                
+                await this.delay(this.config.delay * 1000);
+            } catch (error) {
+                this.addLog(`❌ Erro na tarefa ${i+1}: ${error.message}`, 'error');
             }
         }
+
+        this.renderTasks();
+        this.updateDashboard();
+        this.addLog('✅ Auto-resposta concluída!', 'success');
     }
 
-    // ========== IA / API ==========
-    async getAIAnswer(task) {
+    // ========== API ==========
+    async askAI(question, type) {
         const provider = this.config.apiProvider;
+        const apiKey = this.config.apiKey;
         
+        if (!apiKey) throw new Error('API não configurada');
+
+        const prompt = `Responda APENAS com a letra da alternativa correta (A, B, C, D ou E).\n\nPergunta: ${question}\nTipo: ${type}\n\nResposta:`;
+
         switch (provider) {
             case 'gemini':
-                return await this.callGemini(task);
+                return await this.callGemini(prompt);
             case 'openai':
-                return await this.callOpenAI(task);
+                return await this.callOpenAI(prompt);
             case 'deepseek':
-                return await this.callDeepSeek(task);
-            case 'anthropic':
-                return await this.callClaude(task);
+                return await this.callDeepSeek(prompt);
             case 'custom':
-                return await this.callCustomAPI(task);
+                return await this.callCustom(prompt);
             default:
                 return 'A';
         }
     }
 
-    async callGemini(task) {
-        const apiKey = this.config.apiKey;
-        const model = this.config.apiModel || 'gemini-pro';
-        
+    async callGemini(prompt) {
         const response = await fetch(
-            `https://generativelanguage.googleapis.com/v1/models/${model}:generateContent?key=${apiKey}`,
+            `https://generativelanguage.googleapis.com/v1/models/${this.config.apiModel || 'gemini-pro'}:generateContent?key=${this.config.apiKey}`,
             {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    contents: [{
-                        parts: [{
-                            text: `Você é um assistente educacional. Responda APENAS com a letra da alternativa correta (A, B, C, D ou E).\n\nPergunta: ${task.title}\nTipo: ${task.type}\n\nResposta:`
-                        }]
-                    }],
-                    generationConfig: {
-                        temperature: this.config.apiTemperature,
-                        maxOutputTokens: 10
-                    }
+                    contents: [{ parts: [{ text: prompt }] }],
+                    generationConfig: { temperature: 0.3, maxOutputTokens: 10 }
                 })
             }
         );
         
         const data = await response.json();
-        return data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || 'A';
+        if (data.error) throw new Error(data.error.message);
+        
+        return data.candidates?.[0]?.content?.parts?.[0]?.text?.trim().charAt(0).toUpperCase() || 'A';
     }
 
-    async callOpenAI(task) {
+    async callOpenAI(prompt) {
         const response = await fetch('https://api.openai.com/v1/chat/completions', {
             method: 'POST',
             headers: {
@@ -376,20 +388,19 @@ class LionelApp {
             },
             body: JSON.stringify({
                 model: this.config.apiModel || 'gpt-3.5-turbo',
-                messages: [{
-                    role: 'user',
-                    content: `Responda APENAS com a letra correta:\n${task.title}`
-                }],
-                temperature: this.config.apiTemperature,
-                max_tokens: 10
+                messages: [{ role: 'user', content: prompt }],
+                max_tokens: 10,
+                temperature: 0.3
             })
         });
         
         const data = await response.json();
-        return data.choices?.[0]?.message?.content?.trim() || 'A';
+        if (data.error) throw new Error(data.error.message);
+        
+        return data.choices?.[0]?.message?.content?.trim().charAt(0).toUpperCase() || 'A';
     }
 
-    async callDeepSeek(task) {
+    async callDeepSeek(prompt) {
         const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
             method: 'POST',
             headers: {
@@ -398,135 +409,86 @@ class LionelApp {
             },
             body: JSON.stringify({
                 model: this.config.apiModel || 'deepseek-chat',
-                messages: [{ role: 'user', content: `Responda APENAS com a letra correta:\n${task.title}` }],
-                temperature: this.config.apiTemperature,
+                messages: [{ role: 'user', content: prompt }],
                 max_tokens: 10
             })
         });
         
         const data = await response.json();
-        return data.choices?.[0]?.message?.content?.trim() || 'A';
+        return data.choices?.[0]?.message?.content?.trim().charAt(0).toUpperCase() || 'A';
     }
 
-    async callClaude(task) {
-        const response = await fetch('https://api.anthropic.com/v1/messages', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'x-api-key': this.config.apiKey,
-                'anthropic-version': '2023-06-01'
-            },
-            body: JSON.stringify({
-                model: this.config.apiModel || 'claude-3-sonnet-20240229',
-                max_tokens: 10,
-                messages: [{ role: 'user', content: `Responda APENAS com a letra correta:\n${task.title}` }]
-            })
-        });
-        
-        const data = await response.json();
-        return data.content?.[0]?.text?.trim() || 'A';
-    }
-
-    async callCustomAPI(task) {
+    async callCustom(prompt) {
         const response = await fetch(this.config.apiUrl, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${this.config.apiKey}`
             },
-            body: JSON.stringify({ pergunta: task.title, tipo: task.type })
+            body: JSON.stringify({ prompt })
         });
         
         const data = await response.json();
         return data.resposta || data.answer || 'A';
     }
 
-    async testApiConnection() {
+    async testApi() {
         const resultDiv = document.getElementById('testResult');
-        resultDiv.textContent = '⏳ Testando conexão...';
+        resultDiv.textContent = '⏳ Testando...';
         resultDiv.className = 'test-result loading';
 
         try {
-            const testTask = { title: 'Quanto é 2+2?', type: 'multipla_escolha' };
-            const answer = await this.getAIAnswer(testTask);
-            
-            resultDiv.textContent = `✅ Conexão OK! Resposta: ${answer}`;
+            const answer = await this.askAI('Quanto é 2+2?', 'multipla_escolha');
+            resultDiv.textContent = `✅ Funcionando! Resposta: ${answer}`;
             resultDiv.className = 'test-result success';
             this.addLog('🧪 API testada com sucesso!', 'success');
         } catch (error) {
-            resultDiv.textContent = `❌ Falha: ${error.message}`;
+            resultDiv.textContent = `❌ ${error.message}`;
             resultDiv.className = 'test-result error';
-            this.addLog(`❌ Teste API falhou: ${error.message}`, 'error');
+            this.addLog(`❌ Teste falhou: ${error.message}`, 'error');
         }
     }
 
+    saveApiConfig() {
+        this.config.apiProvider = document.getElementById('apiProvider').value;
+        this.config.apiKey = document.getElementById('apiKey').value;
+        this.config.apiUrl = document.getElementById('apiUrl').value;
+        this.config.proxyUrl = document.getElementById('apiUrl').value; // Worker URL
+        
+        this.saveConfig();
+        this.addLog('🔑 API salva!', 'success');
+    }
+
     // ========== CHAT ==========
-    async sendChatMessage() {
+    async sendChat() {
         const input = document.getElementById('chatInput');
         const message = input.value.trim();
-        
-        if (!message) return;
-        
-        // Adiciona mensagem do usuário
+        if (!message || !this.config.apiKey) return;
+
         this.addChatMessage('user', 'Você', message);
         input.value = '';
-        
-        if (!this.config.apiKey) {
-            this.addChatMessage('bot', 'Lionel', '⚠️ Configure sua API primeiro em 🔑 API para eu poder responder!');
-            return;
-        }
 
-        // Mostra "digitando..."
         const typingId = this.addChatMessage('bot', 'Lionel', '✍️ Pensando...');
-        
+
         try {
             const response = await this.chatWithLionel(message);
-            
-            // Remove "digitando..." e adiciona resposta
             this.removeChatMessage(typingId);
             this.addChatMessage('bot', 'Lionel', response);
         } catch (error) {
             this.removeChatMessage(typingId);
-            this.addChatMessage('bot', 'Lionel', `❌ Erro: ${error.message}. Verifique sua API em 🔑 API.`);
+            this.addChatMessage('bot', 'Lionel', `❌ ${error.message}`);
         }
     }
 
     async chatWithLionel(message) {
-        const apiKey = this.config.apiKey;
-        const model = this.config.apiModel || 'gemini-pro';
-        
-        const systemPrompt = `Você é Lionel, um leão assistente de estudos amigável e inteligente. 
-Suas características:
-- Você SABE que seu nome é Lionel 🦁
-- Você é um leão antropomórfico dourado
-- Você é especialista em todas as matérias escolares
-- Você responde de forma clara, didática e amigável
-- Você usa emojis para ser mais expressivo
-- Você sempre se apresenta como Lionel quando perguntam seu nome
-- Você foi criado para ajudar estudantes na plataforma Sala do Futuro
-- Você pode responder perguntas, explicar conceitos e ajudar com tarefas
+        const systemPrompt = `Você é Lionel, um leão assistente de estudos 🦁. 
+Você SABE que seu nome é Lionel. Você é dourado, amigável e inteligente.
+Responda de forma clara e didática. Use emojis.
 
-Responda a seguinte mensagem do usuário:`;
+Usuário: ${message}
+Lionel:`;
 
-        const response = await fetch(
-            `https://generativelanguage.googleapis.com/v1/models/${model}:generateContent?key=${apiKey}`,
-            {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    contents: [{
-                        parts: [{ text: `${systemPrompt}\n\nUsuário: ${message}\n\nLionel:` }]
-                    }],
-                    generationConfig: {
-                        temperature: 0.9,
-                        maxOutputTokens: 1000
-                    }
-                })
-            }
-        );
-        
-        const data = await response.json();
-        return data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || 'Desculpe, não consegui processar sua mensagem.';
+        return await this.callGemini(systemPrompt);
     }
 
     addChatMessage(type, sender, text) {
@@ -550,108 +512,80 @@ Responda a seguinte mensagem do usuário:`;
     }
 
     removeChatMessage(id) {
-        const msg = document.getElementById(id);
-        if (msg) msg.remove();
+        document.getElementById(id)?.remove();
     }
 
-    // ========== CONFIGURAÇÕES ==========
-    saveApiConfig() {
-        this.config.apiProvider = document.getElementById('apiProvider').value;
-        this.config.apiKey = document.getElementById('apiKey').value;
-        this.config.apiUrl = document.getElementById('apiUrl').value;
-        this.config.apiModel = document.getElementById('apiModel').value;
-        this.config.apiTemperature = parseFloat(document.getElementById('apiTemperature').value);
+    // ========== UI ==========
+    navigateTo(page) {
+        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+        document.querySelectorAll('.menu-item').forEach(m => m.classList.remove('active'));
         
-        this.saveConfig();
-        this.addLog('🔑 API configurada com sucesso!', 'success');
-    }
-
-    saveAllConfig() {
-        this.config.delay = parseInt(document.getElementById('configDelay').value);
-        this.config.useApi = document.getElementById('configUseApi').checked;
-        this.config.fallback = document.getElementById('configFallback').checked;
-        this.config.notifications = document.getElementById('configNotifications').checked;
-        this.config.sound = document.getElementById('configSound').checked;
+        document.getElementById(`page-${page}`)?.classList.add('active');
+        document.querySelector(`[data-page="${page}"]`)?.classList.add('active');
         
-        this.saveConfig();
+        this.toggleMenu(false);
     }
 
-    toggleApiKey() {
-        const input = document.getElementById('apiKey');
-        input.type = input.type === 'password' ? 'text' : 'password';
-    }
-
-    // ========== DASHBOARD ==========
-    updateDashboard() {
-        document.getElementById('statTotal').textContent = this.stats.total;
-        document.getElementById('statDone').textContent = this.stats.done;
-        document.getElementById('statPending').textContent = this.stats.pending;
+    toggleMenu(open) {
+        const sidebar = document.getElementById('sidebar');
+        const overlay = document.getElementById('overlay');
         
-        const accuracy = this.stats.answered > 0 
-            ? Math.round((this.stats.correct / this.stats.answered) * 100) 
-            : 0;
-        document.getElementById('statAccuracy').textContent = accuracy + '%';
+        if (open) {
+            sidebar.classList.add('open');
+            overlay.classList.add('open');
+        } else {
+            sidebar.classList.remove('open');
+            overlay.classList.remove('open');
+        }
     }
 
-    updateStatus(title, message) {
-        document.getElementById('statusTitle').textContent = title;
-        document.getElementById('statusMessage').textContent = message;
-    }
-
-    // ========== LOGS ==========
-    addLog(message, type = 'info') {
-        const log = { timestamp: new Date().toLocaleTimeString(), message, type };
-        this.logs.unshift(log);
-        if (this.logs.length > 200) this.logs.pop();
-        this.renderLogs();
-    }
-
-    renderLogs() {
-        const container = document.getElementById('logContainer');
-        if (!container) return;
+    renderTasks() {
+        const container = document.getElementById('taskList');
         
-        if (this.logs.length === 0) {
-            container.innerHTML = '<div class="empty-state"><span class="empty-icon">📝</span><p>Nenhum log ainda</p></div>';
+        if (this.tasks.length === 0) {
+            container.innerHTML = '<div class="empty-state"><span class="empty-icon">🔍</span><p>Escaneie a plataforma</p></div>';
             return;
         }
 
-        container.innerHTML = this.logs.map(l => 
-            `<div class="log-entry log-${l.type}">[${l.timestamp}] ${l.message}</div>`
-        ).join('');
+        container.innerHTML = this.tasks.map(task => `
+            <div class="task-item">
+                <div class="task-info">
+                    <div class="task-title">${task.text}</div>
+                    <small style="color:#888;">${task.type} ${task.optionsCount ? `(${task.optionsCount} opções)` : ''}</small>
+                </div>
+                <span class="task-status ${task.status}">
+                    ${task.status === 'done' ? '✅' : '⏳'}
+                </span>
+            </div>
+        `).join('');
     }
 
-    clearLogs() {
-        this.logs = [];
-        this.renderLogs();
+    updateDashboard() {
+        document.getElementById('statTotal').textContent = this.stats.total;
+        document.getElementById('statDone').textContent = this.stats.done;
+        document.getElementById('statAI').textContent = this.stats.ai;
     }
 
-    exportLogs() {
-        const text = this.logs.map(l => `[${l.timestamp}] ${l.message}`).join('\n');
-        const blob = new Blob([text], { type: 'text/plain' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `lionel-logs-${Date.now()}.txt`;
-        a.click();
+    addLog(message, type = 'info') {
+        this.logs.unshift({ timestamp: new Date().toLocaleTimeString(), message, type });
+        if (this.logs.length > 200) this.logs.pop();
+        
+        const container = document.getElementById('logContainer');
+        if (container) {
+            container.innerHTML = this.logs.map(l => 
+                `<div class="log-entry log-${l.type}">[${l.timestamp}] ${l.message}</div>`
+            ).join('');
+        }
     }
 
-    // ========== UTILITÁRIOS ==========
     delay(ms) {
         return new Promise(resolve => setTimeout(resolve, ms));
     }
-
-    showNotification(title, body) {
-        if ('Notification' in window && Notification.permission === 'granted') {
-            new Notification(title, { body, icon: '🦁' });
-        }
-    }
 }
 
-// ========== INICIAR ==========
 document.addEventListener('DOMContentLoaded', () => {
     window.lionelApp = new LionelApp();
     
-    // Permissão para notificações
     if ('Notification' in window && Notification.permission === 'default') {
         Notification.requestPermission();
     }
